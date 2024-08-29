@@ -64,6 +64,9 @@ struct BundleAdjustmentOptions {
   // Whether to refine the rotation only.
   bool refine_rotation_only = false;
 
+  // Whether to fix the coordinate system.
+  bool fix_coord_system = false;
+
   // Whether to print a final summary.
   bool print_summary = true;
 

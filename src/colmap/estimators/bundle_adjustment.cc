@@ -326,7 +326,9 @@ void BundleAdjuster::SetUpProblem(Reconstruction* reconstruction,
     AddPointToProblem(point3D_id, reconstruction, loss_function);
   }
 
-  AddCoordinateSystemConstraint(reconstruction);
+  if (options_.fix_coord_system){
+    AddCoordinateSystemConstraint(reconstruction);
+  }
   ParameterizeCameras(reconstruction);
   ParameterizePoints(reconstruction);
 }
