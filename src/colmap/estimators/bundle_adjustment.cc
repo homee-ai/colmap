@@ -326,9 +326,40 @@ void BundleAdjuster::SetUpProblem(Reconstruction* reconstruction,
     AddPointToProblem(point3D_id, reconstruction, loss_function);
   }
 
+  AddCoordinateSystemConstraint(reconstruction);
   ParameterizeCameras(reconstruction);
   ParameterizePoints(reconstruction);
 }
+
+void BundleAdjuster::AddCoordinateSystemConstraint(Reconstruction* reconstruction) {
+  // Choose a reference image (e.g., the first image)
+  const image_t reference_image_id = *config_.Images().begin();
+  Image& reference_image = reconstruction->Image(reference_image_id);
+
+  // Fix the position and orientation of the reference image
+  problem_->SetParameterBlockConstant(reference_image.CamFromWorld().rotation.coeffs().data());
+  problem_->SetParameterBlockConstant(reference_image.CamFromWorld().translation.data());
+
+  // Add a distance constraint between two 3D points to maintain scale
+  if (config_.VariablePoints().size() >= 2) {
+    auto it = config_.VariablePoints().begin();
+    point3D_t point1_id = *it++;
+    point3D_t point2_id = *it;
+
+    Point3D& point1 = reconstruction->Point3D(point1_id);
+    Point3D& point2 = reconstruction->Point3D(point2_id);
+
+    double initial_distance = (point1.xyz - point2.xyz).norm();
+
+    problem_->AddResidualBlock(
+        new ceres::AutoDiffCostFunction<DistanceConstraint, 1, 3, 3>(
+            new DistanceConstraint(initial_distance)),
+        nullptr,  // No loss function for this constraint
+        point1.xyz.data(),
+        point2.xyz.data());
+  }
+}
+
 
 ceres::Solver::Options BundleAdjuster::SetUpSolverOptions(
     const ceres::Problem& problem,
@@ -446,7 +477,9 @@ void BundleAdjuster::AddImageToProblem(const image_t image_id,
     // Set pose parameterization.
     if (!constant_cam_pose) {
       SetQuaternionManifold(problem_.get(), cam_from_world_rotation);
-      if (config_.HasConstantCamPositions(image_id)) {
+      if (options_.refine_rotation_only) {
+        problem_->SetParameterBlockConstant(cam_from_world_translation);
+      } else if (config_.HasConstantCamPositions(image_id)) {
         const std::vector<int>& constant_position_idxs =
             config_.ConstantCamPositions(image_id);
         SetSubsetManifold(3,

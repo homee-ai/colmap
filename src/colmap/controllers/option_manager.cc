@@ -476,6 +476,8 @@ void OptionManager::AddBundleAdjustmentOptions() {
                               &bundle_adjustment->gpu_index);
   AddAndRegisterDefaultOption("BundleAdjustment.min_num_images_gpu_solver",
                               &bundle_adjustment->min_num_images_gpu_solver);
+  AddAndRegisterDefaultOption("BundleAdjustment.refine_rotation_only",
+                            &bundle_adjustment->refine_rotation_only);
   AddAndRegisterDefaultOption(
       "BundleAdjustment.min_num_residuals_for_cpu_multi_threading",
       &bundle_adjustment->min_num_residuals_for_cpu_multi_threading);

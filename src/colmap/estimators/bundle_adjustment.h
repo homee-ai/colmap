@@ -61,6 +61,9 @@ struct BundleAdjustmentOptions {
   // Whether to refine the extrinsic parameter group.
   bool refine_extrinsics = true;
 
+  // Whether to refine the rotation only.
+  bool refine_rotation_only = false;
+
   // Whether to print a final summary.
   bool print_summary = true;
 
@@ -205,6 +208,21 @@ class BundleAdjuster {
   const ceres::Solver::Summary& Summary() const;
 
  private:
+  struct DistanceConstraint {
+    DistanceConstraint(double distance) : distance_(distance) {}
+
+    template <typename T>
+    bool operator()(const T* const p1, const T* const p2, T* residual) const {
+      residual[0] = distance_ - sqrt(
+          (p1[0] - p2[0]) * (p1[0] - p2[0]) +
+          (p1[1] - p2[1]) * (p1[1] - p2[1]) +
+          (p1[2] - p2[2]) * (p1[2] - p2[2]));
+      return true;
+    }
+
+    const double distance_;
+  };
+  void AddCoordinateSystemConstraint(Reconstruction* reconstruction);
   void AddImageToProblem(image_t image_id,
                          Reconstruction* reconstruction,
                          ceres::LossFunction* loss_function);
