@@ -113,6 +113,10 @@ void BindBundleAdjuster(py::module& m) {
       .def("has_constant_cam_intrinsics",
            &BACfg::HasConstantCamIntrinsics,
            "camera_id"_a)
+      .def_readwrite("refine_rotation_only", &BAOpts::refine_rotation_only,
+               "Whether to only refine rotation while keeping translation constant")
+     .def_readwrite("fix_coord_system", &BAOpts::fix_coord_system,
+               "Whether to fix scale and origin of the camera motion")
       .def("set_constant_cam_pose", &BACfg::SetConstantCamPose, "image_id"_a)
       .def("set_variable_cam_pose", &BACfg::SetVariableCamPose, "image_id"_a)
       .def("has_constant_cam_pose", &BACfg::HasConstantCamPose, "image_id"_a)
