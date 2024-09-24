@@ -380,20 +380,29 @@ ceres::Solver::Options BundleAdjuster::SetUpSolverOptions(
       options_.max_num_images_direct_dense_cpu_solver;
   int max_num_images_direct_sparse_solver =
       options_.max_num_images_direct_sparse_cpu_solver;
-#if (CERES_VERSION_MAJOR >= 3 ||                                \
-     (CERES_VERSION_MAJOR == 2 && CERES_VERSION_MINOR >= 2)) && \
-    !defined(CERES_NO_CUDSS) && defined(COLMAP_CUDA_ENABLED)
+
+#ifdef COLMAP_CUDA_ENABLED
+#if (CERES_VERSION_MAJOR >= 3 || \
+     (CERES_VERSION_MAJOR == 2 && CERES_VERSION_MINOR >= 2))
   if (options_.use_gpu && num_images >= options_.min_num_images_gpu_solver) {
     const std::vector<int> gpu_indices = CSVToVector<int>(options_.gpu_index);
     THROW_CHECK_GT(gpu_indices.size(), 0);
     SetBestCudaDevice(gpu_indices[0]);
     solver_options.dense_linear_algebra_library_type = ceres::CUDA;
-    solver_options.sparse_linear_algebra_library_type = ceres::CUDA_SPARSE;
     max_num_images_direct_dense_solver =
         options_.max_num_images_direct_dense_gpu_solver;
+  }
+#endif
+
+#if (CERES_VERSION_MAJOR >= 3 ||                                \
+     (CERES_VERSION_MAJOR == 2 && CERES_VERSION_MINOR >= 3)) && \
+    !defined(CERES_NO_CUDSS)
+  if (options_.use_gpu && num_images >= options_.min_num_images_gpu_solver) {
+    solver_options.sparse_linear_algebra_library_type = ceres::CUDA_SPARSE;
     max_num_images_direct_sparse_solver =
         options_.max_num_images_direct_sparse_gpu_solver;
   }
+#endif
 #endif
 
   if (num_images <= max_num_images_direct_dense_solver) {
@@ -429,7 +438,7 @@ void BundleAdjuster::AddImageToProblem(const image_t image_id,
                                        Reconstruction* reconstruction,
                                        ceres::LossFunction* loss_function) {
   Image& image = reconstruction->Image(image_id);
-  Camera& camera = reconstruction->Camera(image.CameraId());
+  Camera& camera = *image.CameraPtr();
 
   // CostFunction assumes unit quaternions.
   image.CamFromWorld().rotation.normalize();
@@ -514,7 +523,7 @@ void BundleAdjuster::AddPointToProblem(const point3D_t point3D_id,
     point3D_num_observations_[point3D_id] += 1;
 
     Image& image = reconstruction->Image(track_el.image_id);
-    Camera& camera = reconstruction->Camera(image.CameraId());
+    Camera& camera = *image.CameraPtr();
     const Point2D& point2D = image.Point2D(track_el.point2D_idx);
 
     // CostFunction assumes unit quaternions.
@@ -691,7 +700,7 @@ void RigBundleAdjuster::AddImageToProblem(const image_t image_id,
       rig_options_.max_reproj_error * rig_options_.max_reproj_error;
 
   Image& image = reconstruction->Image(image_id);
-  Camera& camera = reconstruction->Camera(image.CameraId());
+  Camera& camera = *image.CameraPtr();
 
   const bool constant_cam_pose = config_.HasConstantCamPose(image_id);
   const bool constant_cam_position = config_.HasConstantCamPositions(image_id);
@@ -725,7 +734,7 @@ void RigBundleAdjuster::AddImageToProblem(const image_t image_id,
   }
 
   // Collect cameras for final parameterization.
-  THROW_CHECK(image.HasCamera());
+  THROW_CHECK(image.HasCameraId());
   camera_ids_.insert(image.CameraId());
 
   // The number of added observations for the current image.
@@ -827,7 +836,7 @@ void RigBundleAdjuster::AddPointToProblem(const point3D_t point3D_id,
     point3D_num_observations_[point3D_id] += 1;
 
     Image& image = reconstruction->Image(track_el.image_id);
-    Camera& camera = reconstruction->Camera(image.CameraId());
+    Camera& camera = *image.CameraPtr();
     const Point2D& point2D = image.Point2D(track_el.point2D_idx);
 
     // We do not want to refine the camera of images that are not
