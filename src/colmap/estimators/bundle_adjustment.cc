@@ -342,49 +342,6 @@ bool BundleAdjuster::Solve(Reconstruction* reconstruction) {
   }
   error_file.close();
 
-  // Save 3D points
-  std::string points3D_filepath;
-  if (options_.save_path.empty()) {
-    points3D_filepath = StringPrintf("3d_points_iter%d.txt", 
-                                   options_.current_iteration+1);
-  } else {
-    points3D_filepath = JoinPaths(options_.save_path,
-                                 StringPrintf("3d_points_iter%d.txt", 
-                                            options_.current_iteration+1));
-  }
-
-  std::ofstream points3D_file(points3D_filepath);
-  points3D_file << "# Format: point3D_id x y z\n";
-  points3D_file << "# Bundle adjustment iteration: " << options_.current_iteration << "\n";
-
-  // Create vectors of point3D IDs and sort them
-  std::vector<point3D_t> sorted_variable_points(config_.VariablePoints().begin(), 
-                                              config_.VariablePoints().end());
-  std::vector<point3D_t> sorted_constant_points(config_.ConstantPoints().begin(), 
-                                              config_.ConstantPoints().end());
-  std::sort(sorted_variable_points.begin(), sorted_variable_points.end());
-  std::sort(sorted_constant_points.begin(), sorted_constant_points.end());
-
-  // Save all variable points
-  for (const auto point3D_id : sorted_variable_points) {
-    const Point3D& point3D = reconstruction->Point3D(point3D_id);
-    points3D_file << point3D_id << " "
-                  << point3D.xyz.x() << " "
-                  << point3D.xyz.y() << " "
-                  << point3D.xyz.z() << "\n";
-  }
-
-  // Save all constant points
-  for (const auto point3D_id : sorted_constant_points) {
-    const Point3D& point3D = reconstruction->Point3D(point3D_id);
-    points3D_file << point3D_id << " "
-                  << point3D.xyz.x() << " "
-                  << point3D.xyz.y() << " "
-                  << point3D.xyz.z() << "\n";
-  }
-
-  points3D_file.close();
-
   if (options_.print_summary || VLOG_IS_ON(1)) {
     PrintSolverSummary(summary_, "Bundle adjustment report");
   }
