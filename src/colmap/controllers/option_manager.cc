@@ -480,6 +480,10 @@ void OptionManager::AddBundleAdjustmentOptions() {
                             &bundle_adjustment->refine_rotation_only);
   AddAndRegisterDefaultOption("BundleAdjustment.fix_coord_system",
                             &bundle_adjustment->fix_coord_system);
+  AddAndRegisterDefaultOption("BundleAdjustment.save_path",
+                              &bundle_adjustment->save_path);
+  AddAndRegisterDefaultOption("BundleAdjustment.current_iteration",
+                              &bundle_adjustment->current_iteration);
   AddAndRegisterDefaultOption(
       "BundleAdjustment.min_num_residuals_for_cpu_multi_threading",
       &bundle_adjustment->min_num_residuals_for_cpu_multi_threading);

@@ -39,6 +39,7 @@
 #include "colmap/util/timer.h"
 
 #include <iomanip>
+#include <chrono>
 
 namespace colmap {
 
@@ -283,7 +284,63 @@ bool BundleAdjuster::Solve(Reconstruction* reconstruction) {
   ceres::Solver::Options solver_options =
       SetUpSolverOptions(*problem_, options_.solver_options);
 
+  // Solve the problem
   ceres::Solve(solver_options, problem_.get(), &summary_);
+
+  // Save reprojection errors
+  std::string error_filepath;
+  if (options_.save_path.empty()) {
+    error_filepath = StringPrintf("reprojection_errors_iter%d.txt", 
+                                options_.current_iteration+1);
+  } else {
+    error_filepath = JoinPaths(options_.save_path,
+                              StringPrintf("reprojection_errors_iter%d.txt", 
+                                         options_.current_iteration+1));
+  }
+
+  std::ofstream error_file(error_filepath);
+  error_file << "# Format: image_id image_name point2D_idx point3D_id x y proj_x proj_y error\n";
+  error_file << "# Bundle adjustment iteration: " << options_.current_iteration << "\n";
+
+  // Create a vector of image IDs and sort it
+  std::vector<image_t> sorted_image_ids(config_.Images().begin(), config_.Images().end());
+  std::sort(sorted_image_ids.begin(), sorted_image_ids.end());
+
+  for (const image_t image_id : sorted_image_ids) {
+    const Image& image = reconstruction->Image(image_id);
+    const Camera& camera = reconstruction->Camera(image.CameraId());
+
+    for (size_t point2D_idx = 0; point2D_idx < image.NumPoints2D(); ++point2D_idx) {
+      const Point2D& point2D = image.Point2D(point2D_idx);
+      if (!point2D.HasPoint3D()) {
+        continue;
+      }
+
+      const Point3D& point3D = reconstruction->Point3D(point2D.point3D_id);
+      
+      // Transform point to local camera coordinate system
+      const Eigen::Vector3d world_point = point3D.xyz;
+      const Eigen::Vector3d local_point = image.CamFromWorld() * world_point;
+      
+      // Project point using camera model
+      const Eigen::Vector2d proj = camera.ImgFromCam(local_point.hnormalized());
+
+      // Compute reprojection error
+      const Eigen::Vector2d error = point2D.xy - proj;
+      const double error_magnitude = error.norm();
+
+      error_file << image_id << " "
+                << image.Name() << " "
+                << point2D_idx << " "
+                << point2D.point3D_id << " "
+                << point2D.xy.x() << " "
+                << point2D.xy.y() << " "
+                << proj.x() << " "
+                << proj.y() << " "
+                << error_magnitude << "\n";
+    }
+  }
+  error_file.close();
 
   if (options_.print_summary || VLOG_IS_ON(1)) {
     PrintSolverSummary(summary_, "Bundle adjustment report");
@@ -326,11 +383,11 @@ void BundleAdjuster::SetUpProblem(Reconstruction* reconstruction,
     AddPointToProblem(point3D_id, reconstruction, loss_function);
   }
 
+  ParameterizeCameras(reconstruction);
+  ParameterizePoints(reconstruction);
   if (options_.fix_coord_system){
     AddCoordinateSystemConstraint(reconstruction);
   }
-  ParameterizeCameras(reconstruction);
-  ParameterizePoints(reconstruction);
 }
 
 void BundleAdjuster::AddCoordinateSystemConstraint(Reconstruction* reconstruction) {
@@ -382,8 +439,9 @@ ceres::Solver::Options BundleAdjuster::SetUpSolverOptions(
       options_.max_num_images_direct_sparse_cpu_solver;
 
 #ifdef COLMAP_CUDA_ENABLED
-#if (CERES_VERSION_MAJOR >= 3 || \
-     (CERES_VERSION_MAJOR == 2 && CERES_VERSION_MINOR >= 2))
+#if (CERES_VERSION_MAJOR >= 3 ||                                \
+     (CERES_VERSION_MAJOR == 2 && CERES_VERSION_MINOR >= 2)) && \
+    !defined(CERES_NO_CUDA)
   if (options_.use_gpu && num_images >= options_.min_num_images_gpu_solver) {
     const std::vector<int> gpu_indices = CSVToVector<int>(options_.gpu_index);
     THROW_CHECK_GT(gpu_indices.size(), 0);

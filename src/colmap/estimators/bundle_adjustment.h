@@ -46,6 +46,9 @@ struct BundleAdjustmentOptions {
   enum class LossFunctionType { TRIVIAL, SOFT_L1, CAUCHY };
   LossFunctionType loss_function_type = LossFunctionType::TRIVIAL;
 
+  // Current BA iteration number (0-based)
+  int current_iteration = 0;
+
   // Scaling factor determines residual at which robustification takes place.
   double loss_function_scale = 1.0;
 
@@ -69,6 +72,12 @@ struct BundleAdjustmentOptions {
 
   // Whether to print a final summary.
   bool print_summary = true;
+
+  // Directory to save reprojection errors
+  std::string save_path = "";
+  
+  // Current bundle adjustment iteration number
+  int iteration = 0;
 
   // Whether to use Ceres' CUDA linear algebra library, if available.
   bool use_gpu = false;
@@ -94,6 +103,8 @@ struct BundleAdjustmentOptions {
 
   // Ceres-Solver options.
   ceres::Solver::Options solver_options;
+
+  
 
   BundleAdjustmentOptions() {
     solver_options.function_tolerance = 0.0;
