@@ -484,6 +484,14 @@ void OptionManager::AddBundleAdjustmentOptions() {
                               &bundle_adjustment->save_path);
   AddAndRegisterDefaultOption("BundleAdjustment.current_iteration",
                               &bundle_adjustment->current_iteration);
+  AddAndRegisterDefaultOption("BundleAdjustment.save_path",
+                              &bundle_adjustment->save_path);
+  AddAndRegisterDefaultOption("BundleAdjustment.current_iteration",
+                              &bundle_adjustment->current_iteration);
+  AddAndRegisterDefaultOption("BundleAdjustment.use_position_prior",
+                              &bundle_adjustment->use_position_prior);
+  AddAndRegisterDefaultOption("BundleAdjustment.position_prior_weight",
+                              &bundle_adjustment->position_prior_weight);
   AddAndRegisterDefaultOption(
       "BundleAdjustment.min_num_residuals_for_cpu_multi_threading",
       &bundle_adjustment->min_num_residuals_for_cpu_multi_threading);

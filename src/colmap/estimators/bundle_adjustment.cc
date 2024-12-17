@@ -349,6 +349,30 @@ bool BundleAdjuster::Solve(Reconstruction* reconstruction) {
   return true;
 }
 
+// 在 BundleAdjuster 類中添加新方法
+void BundleAdjuster::AddPositionPriorConstraints(Reconstruction* reconstruction) {
+    // 可以通過配置來設置這些參數
+    const double position_weight = options_.position_prior_weight;  // 例如 0.1
+    
+    for (const image_t image_id : config_.Images()) {
+        Image& image = reconstruction->Image(image_id);
+        
+        // 跳過固定位置的相機
+        if (config_.HasConstantCamPose(image_id)) {
+            continue;
+        }
+
+        // 獲取初始相機位置作為先驗
+        const Eigen::Vector3d prior_position = image.CamFromWorld().translation;
+
+        // 添加位置軟約束
+        problem_->AddResidualBlock(
+            PositionPriorConstraint::Create(prior_position, position_weight),
+            new ceres::HuberLoss(1.0),  // 使用 Huber loss 來增加魯棒性
+            image.CamFromWorld().translation.data());
+    }
+}
+
 const BundleAdjustmentOptions& BundleAdjuster::Options() const {
   return options_;
 }
@@ -388,6 +412,12 @@ void BundleAdjuster::SetUpProblem(Reconstruction* reconstruction,
   if (options_.fix_coord_system){
     AddCoordinateSystemConstraint(reconstruction);
   }
+
+  if (options_.use_position_prior) {
+    AddPositionPriorConstraints(reconstruction);
+  }
+  ParameterizeCameras(reconstruction);
+  ParameterizePoints(reconstruction);
 }
 
 void BundleAdjuster::AddCoordinateSystemConstraint(Reconstruction* reconstruction) {
@@ -395,9 +425,18 @@ void BundleAdjuster::AddCoordinateSystemConstraint(Reconstruction* reconstructio
   const image_t reference_image_id = *config_.Images().begin();
   Image& reference_image = reconstruction->Image(reference_image_id);
 
-  // Fix the position and orientation of the reference image
-  problem_->SetParameterBlockConstant(reference_image.CamFromWorld().rotation.coeffs().data());
-  problem_->SetParameterBlockConstant(reference_image.CamFromWorld().translation.data());
+  // Check if the parameters are already in the problem
+  double* rotation_data = reference_image.CamFromWorld().rotation.coeffs().data();
+  double* translation_data = reference_image.CamFromWorld().translation.data();
+
+  // Only set parameters constant if they exist in the problem
+  if (problem_->HasParameterBlock(rotation_data)) {
+    problem_->SetParameterBlockConstant(rotation_data);
+  }
+  
+  if (problem_->HasParameterBlock(translation_data)) {
+    problem_->SetParameterBlockConstant(translation_data);
+  }
 
   // Add a distance constraint between two 3D points to maintain scale
   if (config_.VariablePoints().size() >= 2) {
@@ -410,14 +449,19 @@ void BundleAdjuster::AddCoordinateSystemConstraint(Reconstruction* reconstructio
 
     double initial_distance = (point1.xyz - point2.xyz).norm();
 
-    problem_->AddResidualBlock(
-        new ceres::AutoDiffCostFunction<DistanceConstraint, 1, 3, 3>(
-            new DistanceConstraint(initial_distance)),
-        nullptr,  // No loss function for this constraint
-        point1.xyz.data(),
-        point2.xyz.data());
+    // Only add the constraint if both points are in the problem
+    if (problem_->HasParameterBlock(point1.xyz.data()) && 
+        problem_->HasParameterBlock(point2.xyz.data())) {
+      problem_->AddResidualBlock(
+          new ceres::AutoDiffCostFunction<DistanceConstraint, 1, 3, 3>(
+              new DistanceConstraint(initial_distance)),
+          nullptr,  // No loss function for this constraint
+          point1.xyz.data(),
+          point2.xyz.data());
+    }
   }
 }
+
 
 
 ceres::Solver::Options BundleAdjuster::SetUpSolverOptions(
