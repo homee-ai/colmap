@@ -79,6 +79,18 @@ struct BundleAdjustmentOptions {
   // Current bundle adjustment iteration number
   int iteration = 0;
 
+  // 位置先驗約束的權重
+  double position_prior_weight = 0.1;
+    
+  // 是否使用位置先驗約束
+  bool use_position_prior = true;
+
+  // Directory to save reprojection errors
+  std::string save_path = "";
+  
+  // Current bundle adjustment iteration number
+  int iteration = 0;
+
   // Whether to use Ceres' CUDA linear algebra library, if available.
   bool use_gpu = false;
   std::string gpu_index = "-1";
@@ -236,7 +248,35 @@ class BundleAdjuster {
 
     const double distance_;
   };
+
+  // 首先定義一個位置約束的 cost function
+  struct PositionPriorConstraint {
+      PositionPriorConstraint(const Eigen::Vector3d& prior_position, double weight)
+          : prior_position_(prior_position), weight_(weight) {}
+
+      template <typename T>
+      bool operator()(const T* const position, T* residuals) const {
+          // 計算當前位置與先驗位置的差異
+          residuals[0] = weight_ * (position[0] - T(prior_position_[0]));
+          residuals[1] = weight_ * (position[1] - T(prior_position_[1]));
+          residuals[2] = weight_ * (position[2] - T(prior_position_[2]));
+          return true;
+      }
+
+      static ceres::CostFunction* Create(const Eigen::Vector3d& prior_position, 
+                                      double weight) {
+          return new ceres::AutoDiffCostFunction<PositionPriorConstraint, 3, 3>(
+              new PositionPriorConstraint(prior_position, weight));
+      }
+
+      const Eigen::Vector3d prior_position_;
+      const double weight_;
+  };
+
   void AddCoordinateSystemConstraint(Reconstruction* reconstruction);
+
+  void AddPositionPriorConstraints(Reconstruction* reconstruction);
+
   void AddImageToProblem(image_t image_id,
                          Reconstruction* reconstruction,
                          ceres::LossFunction* loss_function);
