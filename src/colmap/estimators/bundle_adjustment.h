@@ -85,12 +85,6 @@ struct BundleAdjustmentOptions {
   // 是否使用位置先驗約束
   bool use_position_prior = false;
 
-  // Directory to save reprojection errors
-  std::string save_path = "";
-  
-  // Current bundle adjustment iteration number
-  int iteration = 0;
-
   // Whether to use Ceres' CUDA linear algebra library, if available.
   bool use_gpu = false;
   std::string gpu_index = "-1";
