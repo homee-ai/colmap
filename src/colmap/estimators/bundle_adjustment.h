@@ -83,7 +83,7 @@ struct BundleAdjustmentOptions {
   double position_prior_weight = 0.1;
     
   // 是否使用位置先驗約束
-  bool use_position_prior = true;
+  bool use_position_prior = false;
 
   // Directory to save reprojection errors
   std::string save_path = "";
