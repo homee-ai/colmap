@@ -480,10 +480,8 @@ void OptionManager::AddBundleAdjustmentOptions() {
                             &bundle_adjustment->refine_rotation_only);
   AddAndRegisterDefaultOption("BundleAdjustment.fix_coord_system",
                             &bundle_adjustment->fix_coord_system);
-  AddAndRegisterDefaultOption("BundleAdjustment.save_path",
-                              &bundle_adjustment->save_path);
-  AddAndRegisterDefaultOption("BundleAdjustment.current_iteration",
-                              &bundle_adjustment->current_iteration);
+  AddAndRegisterDefaultOption("BundleAdjustment.fix_global_coord_system",
+                            &bundle_adjustment->fix_global_coord_system);
   AddAndRegisterDefaultOption("BundleAdjustment.save_path",
                               &bundle_adjustment->save_path);
   AddAndRegisterDefaultOption("BundleAdjustment.current_iteration",

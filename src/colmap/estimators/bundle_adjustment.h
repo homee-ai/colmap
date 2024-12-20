@@ -70,6 +70,9 @@ struct BundleAdjustmentOptions {
   // Whether to fix the coordinate system.
   bool fix_coord_system = false;
 
+  // Whether to fix the global coordinate system.
+  bool fix_global_coord_system = false;
+
   // Whether to print a final summary.
   bool print_summary = true;
 
@@ -268,6 +271,8 @@ class BundleAdjuster {
   };
 
   void AddCoordinateSystemConstraint(Reconstruction* reconstruction);
+
+  void AddGlobalCoordinateSystemConstraint(Reconstruction* reconstruction);
 
   void AddPositionPriorConstraints(Reconstruction* reconstruction);
 

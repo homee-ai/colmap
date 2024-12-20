@@ -413,6 +413,10 @@ void BundleAdjuster::SetUpProblem(Reconstruction* reconstruction,
     AddCoordinateSystemConstraint(reconstruction);
   }
 
+  if (options_.fix_global_coord_system){
+    AddGlobalCoordinateSystemConstraint(reconstruction);
+  }
+
   if (options_.use_position_prior) {
     AddPositionPriorConstraints(reconstruction);
   }
@@ -462,6 +466,55 @@ void BundleAdjuster::AddCoordinateSystemConstraint(Reconstruction* reconstructio
   }
 }
 
+void BundleAdjuster::AddGlobalCoordinateSystemConstraint(Reconstruction* reconstruction) {
+  // Choose a reference image (e.g., the first image)
+  const image_t reference_image_id = *config_.Images().begin();
+  Image& reference_image = reconstruction->Image(reference_image_id);
+
+  // Check if the parameters are already in the problem
+  double* rotation_data = reference_image.CamFromWorld().rotation.coeffs().data();
+  double* translation_data = reference_image.CamFromWorld().translation.data();
+
+  // Only set parameters constant if they exist in the problem
+  if (problem_->HasParameterBlock(rotation_data)) {
+    problem_->SetParameterBlockConstant(rotation_data);
+  }
+  
+  if (problem_->HasParameterBlock(translation_data)) {
+    problem_->SetParameterBlockConstant(translation_data);
+  }
+
+  // Create a vector of sorted image IDs to ensure sequential ordering
+  std::vector<image_t> sorted_image_ids(config_.Images().begin(), config_.Images().end());
+  std::sort(sorted_image_ids.begin(), sorted_image_ids.end());
+
+  // Add distance constraints between sequential camera pairs
+  for (size_t i = 0; i < sorted_image_ids.size() - 1; i++) {
+    Image& image1 = reconstruction->Image(sorted_image_ids[i]);
+    Image& image2 = reconstruction->Image(sorted_image_ids[i + 1]);
+
+    // Get camera centers
+    const Eigen::Vector3d center1 = image1.CamFromWorld().translation;
+    const Eigen::Vector3d center2 = image2.CamFromWorld().translation;
+
+    // Calculate initial distance between camera centers
+    double initial_distance = (center2 - center1).norm();
+
+    // Only add the constraint if both camera positions are in the problem
+    double* translation1 = image1.CamFromWorld().translation.data();
+    double* translation2 = image2.CamFromWorld().translation.data();
+
+    if (problem_->HasParameterBlock(translation1) && 
+        problem_->HasParameterBlock(translation2)) {
+      problem_->AddResidualBlock(
+          new ceres::AutoDiffCostFunction<DistanceConstraint, 1, 3, 3>(
+              new DistanceConstraint(initial_distance)),
+          new ceres::HuberLoss(1.0),  // Add robust loss function to handle noise
+          translation1,
+          translation2);
+    }
+  }
+}
 
 
 ceres::Solver::Options BundleAdjuster::SetUpSolverOptions(
