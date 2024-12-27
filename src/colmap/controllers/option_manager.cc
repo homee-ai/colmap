@@ -480,8 +480,14 @@ void OptionManager::AddBundleAdjustmentOptions() {
                             &bundle_adjustment->refine_rotation_only);
   AddAndRegisterDefaultOption("BundleAdjustment.fix_coord_system",
                             &bundle_adjustment->fix_coord_system);
-  AddAndRegisterDefaultOption("BundleAdjustment.fix_global_coord_system",
-                            &bundle_adjustment->fix_global_coord_system);
+  AddAndRegisterDefaultOption("BundleAdjustment.sequential_pairwise_constraint",
+                            &bundle_adjustment->sequential_pairwise_constraint);
+  AddAndRegisterDefaultOption("BundleAdjustment.sequential_translation_constraint",
+                            &bundle_adjustment->sequential_translation_constraint);
+  AddAndRegisterDefaultOption("BundleAdjustment.sequential_translation_weight",
+                            &bundle_adjustment->sequential_translation_weight);
+  AddAndRegisterDefaultOption("BundleAdjustment.sequential_rotation_weight",
+                            &bundle_adjustment->sequential_rotation_weight);
   AddAndRegisterDefaultOption("BundleAdjustment.save_path",
                               &bundle_adjustment->save_path);
   AddAndRegisterDefaultOption("BundleAdjustment.current_iteration",

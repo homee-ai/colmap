@@ -70,8 +70,17 @@ struct BundleAdjustmentOptions {
   // Whether to fix the coordinate system.
   bool fix_coord_system = false;
 
-  // Whether to fix the global coordinate system.
-  bool fix_global_coord_system = false;
+  // Whether to add pose constraint between sequential images.
+  bool sequential_pairwise_constraint = false;
+
+  // Whether to add translation constraint between sequential images.
+  bool sequential_translation_constraint = false;
+  
+  // Weight for the translation constraint. 
+  double sequential_translation_weight = 1.0;
+  
+  // Weight for the rotation constraint.
+  double sequential_rotation_weight = 1.0;
 
   // Whether to print a final summary.
   bool print_summary = true;
@@ -246,6 +255,59 @@ class BundleAdjuster {
     const double distance_;
   };
 
+  // Vector difference constraint between two camera positions
+  struct VectorDifferenceConstraint {
+    VectorDifferenceConstraint(const Eigen::Vector3d& expected_diff, 
+                             const double weight)
+        : expected_diff_(expected_diff), weight_(weight) {}
+
+    template <typename T>
+    bool operator()(const T* const x1, const T* const x2, T* residuals) const {
+        for (size_t i = 0; i < 3; ++i) {
+            residuals[i] = weight_ * (x2[i] - x1[i] - T(expected_diff_[i]));
+        }
+        return true;
+    }
+
+    const Eigen::Vector3d expected_diff_;
+    const double weight_;
+};
+
+  // Cost function that enforces a relative rotation between two cameras
+  struct RelativeRotationConstraint {
+    explicit RelativeRotationConstraint(const Eigen::Quaterniond& relative_rotation)
+        : relative_rotation_(relative_rotation) {}
+
+    template <typename T>
+    bool operator()(const T* const qvec1, const T* const qvec2, T* residuals) const {
+        const Eigen::Quaternion<T> q1(qvec1[0], qvec1[1], qvec1[2], qvec1[3]);
+        const Eigen::Quaternion<T> q2(qvec2[0], qvec2[1], qvec2[2], qvec2[3]);
+
+        // Convert target relative rotation to template type
+        const Eigen::Quaternion<T> target_relative_rotation(
+            T(relative_rotation_.w()),
+            T(relative_rotation_.x()),
+            T(relative_rotation_.y()),
+            T(relative_rotation_.z()));
+
+        // Compute the current relative rotation
+        const Eigen::Quaternion<T> current_relative_rotation = q2 * q1.inverse();
+
+        // Compute the error quaternion between target and current relative rotations
+        const Eigen::Quaternion<T> error = target_relative_rotation.inverse() * current_relative_rotation;
+
+        // Use the vector part of the quaternion as the residual
+        // This represents the rotation error in a compact form
+        residuals[0] = error.x();
+        residuals[1] = error.y();
+        residuals[2] = error.z();
+
+        return true;
+    }
+
+    const Eigen::Quaterniond relative_rotation_;
+  };
+
   // 首先定義一個位置約束的 cost function
   struct PositionPriorConstraint {
       PositionPriorConstraint(const Eigen::Vector3d& prior_position, double weight)
@@ -272,7 +334,9 @@ class BundleAdjuster {
 
   void AddCoordinateSystemConstraint(Reconstruction* reconstruction);
 
-  void AddGlobalCoordinateSystemConstraint(Reconstruction* reconstruction);
+  void AddSequentialPairwisePoseConstraint(Reconstruction* reconstruction);
+
+  void AddSequentialTranslationConstraint(Reconstruction* reconstruction);
 
   void AddPositionPriorConstraints(Reconstruction* reconstruction);
 
