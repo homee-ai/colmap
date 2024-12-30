@@ -290,11 +290,11 @@ class BundleAdjuster {
             T(relative_rotation_.y()),
             T(relative_rotation_.z()));
 
-        // Compute the current relative rotation
-        const Eigen::Quaternion<T> current_relative_rotation = q2 * q1.inverse();
+        // Compute the current relative rotation and normalize
+        const Eigen::Quaternion<T> current_relative_rotation = (q2 * q1.inverse()).normalized();
 
         // Compute the error quaternion between target and current relative rotations
-        const Eigen::Quaternion<T> error = target_relative_rotation.inverse() * current_relative_rotation;
+        const Eigen::Quaternion<T> error = (target_relative_rotation.inverse() * current_relative_rotation).normalized();
 
         // Use the vector part of the quaternion as the residual
         // This represents the rotation error in a compact form
