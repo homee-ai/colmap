@@ -395,12 +395,14 @@ void BundleAdjuster::AddSequentialTranslationConstraint(Reconstruction* reconstr
 
         // Convert camera-from-world to world-from-camera transformations
         const Rigid3d world_from_cam1(
-            image1.CamFromWorld().rotation.inverse(),
-            -(image1.CamFromWorld().rotation.inverse() * image1.CamFromWorld().translation));
+            image1.CamFromWorld().rotation.inverse().normalized(),
+            -(image1.CamFromWorld().rotation.inverse().normalized() * 
+              image1.CamFromWorld().translation));
         
         const Rigid3d world_from_cam2(
-            image2.CamFromWorld().rotation.inverse(),
-            -(image2.CamFromWorld().rotation.inverse() * image2.CamFromWorld().translation));
+            image2.CamFromWorld().rotation.inverse().normalized(),
+            -(image2.CamFromWorld().rotation.inverse().normalized() * 
+              image2.CamFromWorld().translation));
 
         // Calculate initial camera centers (in world coordinates)
         const Eigen::Vector3d center1 = world_from_cam1.translation;
@@ -551,24 +553,31 @@ void BundleAdjuster::AddSequentialPairwisePoseConstraint(Reconstruction* reconst
     Image& image1 = reconstruction->Image(sorted_image_ids[i]);
     Image& image2 = reconstruction->Image(sorted_image_ids[i + 1]);
 
+    // Normalize quaternions before any operations
+    image1.CamFromWorld().rotation.normalize();
+    image2.CamFromWorld().rotation.normalize();
+
     // Convert camera-from-world to world-from-camera transformations
     const Rigid3d world_from_cam1(
-        image1.CamFromWorld().rotation.inverse(),
-        -(image1.CamFromWorld().rotation.inverse() * image1.CamFromWorld().translation));
+        image1.CamFromWorld().rotation.inverse().normalized(),
+        -(image1.CamFromWorld().rotation.inverse().normalized() * 
+          image1.CamFromWorld().translation));
     
     const Rigid3d world_from_cam2(
-        image2.CamFromWorld().rotation.inverse(),
-        -(image2.CamFromWorld().rotation.inverse() * image2.CamFromWorld().translation));
+        image2.CamFromWorld().rotation.inverse().normalized(),
+        -(image2.CamFromWorld().rotation.inverse().normalized() * 
+          image2.CamFromWorld().translation));
 
     // Calculate initial camera centers (in world coordinates)
     const Eigen::Vector3d center1 = world_from_cam1.translation;
     const Eigen::Vector3d center2 = world_from_cam2.translation;
 
     // Calculate initial relative transformation between cameras
-    // relative_rotation = R2^(-1) * R1 where R1, R2 are world-from-camera rotations
+    // Ensure all quaternion operations maintain normalization
     const Eigen::Vector3d initial_translation_diff = center2 - center1;
     const Eigen::Quaterniond initial_relative_rotation = 
-        image2.CamFromWorld().rotation * image1.CamFromWorld().rotation.inverse();
+        (image2.CamFromWorld().rotation * 
+         image1.CamFromWorld().rotation.inverse()).normalized();
 
     // Only add constraints if both cameras' parameters are in the problem
     double* rotation1 = image1.CamFromWorld().rotation.coeffs().data();
@@ -786,10 +795,15 @@ void BundleAdjuster::AddPointToProblem(const point3D_t point3D_id,
 
 void BundleAdjuster::ParameterizeCameras(Reconstruction* reconstruction) {
   const bool constant_camera = !options_.refine_focal_length &&
-                               !options_.refine_principal_point &&
-                               !options_.refine_extra_params;
+                             !options_.refine_principal_point &&
+                             !options_.refine_extra_params;
   for (const camera_t camera_id : camera_ids_) {
     Camera& camera = reconstruction->Camera(camera_id);
+
+    // Skip if parameter block is not in the problem
+    if (!problem_->HasParameterBlock(camera.params.data())) {
+      continue;
+    }
 
     if (constant_camera || config_.HasConstantCamIntrinsics(camera_id)) {
       problem_->SetParameterBlockConstant(camera.params.data());
@@ -813,11 +827,12 @@ void BundleAdjuster::ParameterizeCameras(Reconstruction* reconstruction) {
             const_camera_params.end(), params_idxs.begin(), params_idxs.end());
       }
 
-      if (const_camera_params.size() > 0) {
+      if (const_camera_params.size() > 0 && 
+          !problem_->GetParameterization(camera.params.data())) {
         SetSubsetManifold(static_cast<int>(camera.params.size()),
-                          const_camera_params,
-                          problem_.get(),
-                          camera.params.data());
+                         const_camera_params,
+                         problem_.get(),
+                         camera.params.data());
       }
     }
   }
