@@ -41,111 +41,6 @@
 
 namespace colmap {
 
-struct BundleAdjustmentOptions {
-  // Loss function types: Trivial (non-robust) and Cauchy (robust) loss.
-  enum class LossFunctionType { TRIVIAL, SOFT_L1, CAUCHY };
-  LossFunctionType loss_function_type = LossFunctionType::TRIVIAL;
-
-  // Current BA iteration number (0-based)
-  int current_iteration = 0;
-
-  // Scaling factor determines residual at which robustification takes place.
-  double loss_function_scale = 1.0;
-
-  // Whether to refine the focal length parameter group.
-  bool refine_focal_length = true;
-
-  // Whether to refine the principal point parameter group.
-  bool refine_principal_point = false;
-
-  // Whether to refine the extra parameter group.
-  bool refine_extra_params = true;
-
-  // Whether to refine the extrinsic parameter group.
-  bool refine_extrinsics = true;
-
-  // Whether to refine the rotation only.
-  bool refine_rotation_only = false;
-
-  // Whether to fix the coordinate system.
-  bool fix_coord_system = false;
-
-  // Whether to add pose constraint between sequential images.
-  bool sequential_pairwise_constraint = false;
-
-  // Whether to add translation constraint between sequential images.
-  bool sequential_translation_constraint = false;
-  
-  // Weight for the translation constraint. 
-  double sequential_translation_weight = 1.0;
-  
-  // Weight for the rotation constraint.
-  double sequential_rotation_weight = 1.0;
-
-  // Whether to print a final summary.
-  bool print_summary = true;
-
-  // Directory to save reprojection errors
-  std::string save_path = "";
-  
-  // Current bundle adjustment iteration number
-  int iteration = 0;
-
-  // 位置先驗約束的權重
-  double position_prior_weight = 0.1;
-    
-  // 是否使用位置先驗約束
-  bool use_position_prior = false;
-
-  // Whether to use Ceres' CUDA linear algebra library, if available.
-  bool use_gpu = false;
-  std::string gpu_index = "-1";
-
-  // Heuristic threshold to switch from CPU to GPU based solvers.
-  // Typically, the GPU is faster for large problems but the overhead of
-  // transferring memory from the CPU to the GPU leads to better CPU performance
-  // for small problems. This depends on the specific problem and hardware.
-  int min_num_images_gpu_solver = 50;
-
-  // Heuristic threshold on the minimum number of residuals to enable
-  // multi-threading. Note that single-threaded is typically better for small
-  // bundle adjustment problems due to the overhead of threading.
-  int min_num_residuals_for_cpu_multi_threading = 50000;
-
-  // Heuristic thresholds to switch between direct, sparse, and iterative
-  // solvers. These thresholds may not be optimal for all types of problems.
-  int max_num_images_direct_dense_cpu_solver = 50;
-  int max_num_images_direct_sparse_cpu_solver = 1000;
-  int max_num_images_direct_dense_gpu_solver = 200;
-  int max_num_images_direct_sparse_gpu_solver = 4000;
-
-  // Ceres-Solver options.
-  ceres::Solver::Options solver_options;
-
-  
-
-  BundleAdjustmentOptions() {
-    solver_options.function_tolerance = 0.0;
-    solver_options.gradient_tolerance = 1e-4;
-    solver_options.parameter_tolerance = 0.0;
-    solver_options.logging_type = ceres::LoggingType::SILENT;
-    solver_options.max_num_iterations = 100;
-    solver_options.max_linear_solver_iterations = 200;
-    solver_options.max_num_consecutive_invalid_steps = 10;
-    solver_options.max_consecutive_nonmonotonic_steps = 10;
-    solver_options.num_threads = -1;
-#if CERES_VERSION_MAJOR < 2
-    solver_options.num_linear_solver_threads = -1;
-#endif  // CERES_VERSION_MAJOR
-  }
-
-  // Create a new loss function based on the specified options. The caller
-  // takes ownership of the loss function.
-  ceres::LossFunction* CreateLossFunction() const;
-
-  bool Check() const;
-};
-
 // Configuration container to setup bundle adjustment problems.
 class BundleAdjustmentConfig {
  public:
@@ -215,212 +110,170 @@ class BundleAdjustmentConfig {
   std::unordered_map<image_t, std::vector<int>> constant_cam_positions_;
 };
 
-// Bundle adjustment based on Ceres-Solver. Enables most flexible configurations
-// and provides best solution quality.
+struct BundleAdjustmentOptions {
+  // Loss function types: Trivial (non-robust) and Cauchy (robust) loss.
+  enum class LossFunctionType { TRIVIAL, SOFT_L1, CAUCHY };
+  LossFunctionType loss_function_type = LossFunctionType::TRIVIAL;
+
+  // Current BA iteration number (0-based)
+  int current_iteration = 0;
+
+  // Whether to refine the rotation only.
+  bool refine_rotation_only = false;
+  
+    // Whether to fix the coordinate system.
+  bool fix_coord_system = false;
+
+  // Whether to add pose constraint between sequential images.
+  bool sequential_pairwise_constraint = false;
+
+  // Whether to add translation constraint between sequential images.
+  bool sequential_translation_constraint = false;
+  
+  // Weight for the translation constraint. 
+  double sequential_translation_weight = 1.0;
+  
+  // Weight for the rotation constraint.
+  double sequential_rotation_weight = 1.0;
+
+  // Directory to save reprojection errors
+  std::string save_path = "";
+
+  // 位置先驗約束的權重
+  double position_prior_weight = 0.1;
+    
+  // 是否使用位置先驗約束
+  bool use_position_prior = false;
+
+  // Scaling factor determines residual at which robustification takes place.
+  double loss_function_scale = 1.0;
+
+  // Whether to refine the focal length parameter group.
+  bool refine_focal_length = true;
+
+  // Whether to refine the principal point parameter group.
+  bool refine_principal_point = false;
+
+  // Whether to refine the extra parameter group.
+  bool refine_extra_params = true;
+
+  // Whether to refine the extrinsic parameter group.
+  bool refine_extrinsics = true;
+
+  // Whether to print a final summary.
+  bool print_summary = true;
+
+  // Whether to use Ceres' CUDA linear algebra library, if available.
+  bool use_gpu = false;
+  std::string gpu_index = "-1";
+
+  // Heuristic threshold to switch from CPU to GPU based solvers.
+  // Typically, the GPU is faster for large problems but the overhead of
+  // transferring memory from the CPU to the GPU leads to better CPU performance
+  // for small problems. This depends on the specific problem and hardware.
+  int min_num_images_gpu_solver = 50;
+
+  // Heuristic threshold on the minimum number of residuals to enable
+  // multi-threading. Note that single-threaded is typically better for small
+  // bundle adjustment problems due to the overhead of threading.
+  int min_num_residuals_for_cpu_multi_threading = 50000;
+
+  // Heuristic thresholds to switch between direct, sparse, and iterative
+  // solvers. These thresholds may not be optimal for all types of problems.
+  int max_num_images_direct_dense_cpu_solver = 50;
+  int max_num_images_direct_sparse_cpu_solver = 1000;
+  int max_num_images_direct_dense_gpu_solver = 200;
+  int max_num_images_direct_sparse_gpu_solver = 4000;
+
+  // Ceres-Solver options.
+  ceres::Solver::Options solver_options;
+
+  BundleAdjustmentOptions() {
+    solver_options.function_tolerance = 0.0;
+    solver_options.gradient_tolerance = 1e-4;
+    solver_options.parameter_tolerance = 0.0;
+    solver_options.logging_type = ceres::LoggingType::SILENT;
+    solver_options.max_num_iterations = 100;
+    solver_options.max_linear_solver_iterations = 200;
+    solver_options.max_num_consecutive_invalid_steps = 10;
+    solver_options.max_consecutive_nonmonotonic_steps = 10;
+    solver_options.num_threads = -1;
+#if CERES_VERSION_MAJOR < 2
+    solver_options.num_linear_solver_threads = -1;
+#endif  // CERES_VERSION_MAJOR
+  }
+
+  // Create a new loss function based on the specified options. The caller
+  // takes ownership of the loss function.
+  ceres::LossFunction* CreateLossFunction() const;
+
+  // Create options tailored for given bundle adjustment config and problem.
+  ceres::Solver::Options CreateSolverOptions(
+      const BundleAdjustmentConfig& config,
+      const ceres::Problem& problem) const;
+
+  bool Check() const;
+};
+
+struct RigBundleAdjustmentOptions {
+  // Whether to optimize the relative poses of the camera rigs.
+  bool refine_relative_poses = true;
+
+  // The maximum allowed reprojection error for an observation to be
+  // considered in the bundle adjustment. Some observations might have large
+  // reprojection errors due to the concatenation of the absolute and relative
+  // rig poses, which might be different from the absolute pose of the image
+  // in the reconstruction.
+  double max_reproj_error = 1000.0;
+};
+
+struct PosePriorBundleAdjustmentOptions {
+  // Whether to use a robust loss on prior locations.
+  bool use_robust_loss_on_prior_position = false;
+
+  // Threshold on the residual for the robust loss
+  // (chi2 for 3DOF at 95% = 7.815).
+  double prior_position_loss_scale = 7.815;
+
+  // Maximum RANSAC error for Sim3 alignment.
+  double ransac_max_error = 0.;
+};
+
 class BundleAdjuster {
  public:
-  BundleAdjuster(const BundleAdjustmentOptions& options,
-                 const BundleAdjustmentConfig& config);
+  BundleAdjuster(BundleAdjustmentOptions options,
+                 BundleAdjustmentConfig config);
+  virtual ~BundleAdjuster() = default;
 
-  bool Solve(Reconstruction* reconstruction);
+  virtual ceres::Solver::Summary Solve() = 0;
+  virtual std::shared_ptr<ceres::Problem>& Problem() = 0;
 
-  // Set up the problem
-  void SetUpProblem(Reconstruction* reconstruction,
-                    ceres::LossFunction* loss_function);
-  ceres::Solver::Options SetUpSolverOptions(
-      const ceres::Problem& problem,
-      const ceres::Solver::Options& input_solver_options) const;
-
-  // Getter functions below
   const BundleAdjustmentOptions& Options() const;
   const BundleAdjustmentConfig& Config() const;
-  // Get the Ceres problem after the last call to "set_up"
-  std::shared_ptr<ceres::Problem> Problem();
-  // Get the Ceres solver summary after the last call to `Solve`.
-  const ceres::Solver::Summary& Summary() const;
-
- private:
-  struct DistanceConstraint {
-    DistanceConstraint(double distance) : distance_(distance) {}
-
-    template <typename T>
-    bool operator()(const T* const p1, const T* const p2, T* residual) const {
-      residual[0] = distance_ - sqrt(
-          (p1[0] - p2[0]) * (p1[0] - p2[0]) +
-          (p1[1] - p2[1]) * (p1[1] - p2[1]) +
-          (p1[2] - p2[2]) * (p1[2] - p2[2]));
-      return true;
-    }
-
-    const double distance_;
-  };
-
-  // Vector difference constraint between two camera positions
-  struct VectorDifferenceConstraint {
-    VectorDifferenceConstraint(const Eigen::Vector3d& expected_diff, 
-                             const double weight)
-        : expected_diff_(expected_diff), weight_(weight) {}
-
-    template <typename T>
-    bool operator()(const T* const x1, const T* const x2, T* residuals) const {
-        for (size_t i = 0; i < 3; ++i) {
-            residuals[i] = weight_ * (x2[i] - x1[i] - T(expected_diff_[i]));
-        }
-        return true;
-    }
-
-    const Eigen::Vector3d expected_diff_;
-    const double weight_;
-};
-
-  // Cost function that enforces a relative rotation between two cameras
-  struct RelativeRotationConstraint {
-    explicit RelativeRotationConstraint(const Eigen::Quaterniond& relative_rotation)
-        : relative_rotation_(relative_rotation) {}
-
-    template <typename T>
-    bool operator()(const T* const qvec1, const T* const qvec2, T* residuals) const {
-        const Eigen::Quaternion<T> q1(qvec1[0], qvec1[1], qvec1[2], qvec1[3]);
-        const Eigen::Quaternion<T> q2(qvec2[0], qvec2[1], qvec2[2], qvec2[3]);
-
-        // Convert target relative rotation to template type
-        const Eigen::Quaternion<T> target_relative_rotation(
-            T(relative_rotation_.w()),
-            T(relative_rotation_.x()),
-            T(relative_rotation_.y()),
-            T(relative_rotation_.z()));
-
-        // Compute the current relative rotation and normalize
-        const Eigen::Quaternion<T> current_relative_rotation = (q2 * q1.inverse()).normalized();
-
-        // Compute the error quaternion between target and current relative rotations
-        const Eigen::Quaternion<T> error = (target_relative_rotation.inverse() * current_relative_rotation).normalized();
-
-        // Use the vector part of the quaternion as the residual
-        // This represents the rotation error in a compact form
-        residuals[0] = error.x();
-        residuals[1] = error.y();
-        residuals[2] = error.z();
-
-        return true;
-    }
-
-    const Eigen::Quaterniond relative_rotation_;
-  };
-
-  // 首先定義一個位置約束的 cost function
-  struct PositionPriorConstraint {
-      PositionPriorConstraint(const Eigen::Vector3d& prior_position, double weight)
-          : prior_position_(prior_position), weight_(weight) {}
-
-      template <typename T>
-      bool operator()(const T* const position, T* residuals) const {
-          // 計算當前位置與先驗位置的差異
-          residuals[0] = weight_ * (position[0] - T(prior_position_[0]));
-          residuals[1] = weight_ * (position[1] - T(prior_position_[1]));
-          residuals[2] = weight_ * (position[2] - T(prior_position_[2]));
-          return true;
-      }
-
-      static ceres::CostFunction* Create(const Eigen::Vector3d& prior_position, 
-                                      double weight) {
-          return new ceres::AutoDiffCostFunction<PositionPriorConstraint, 3, 3>(
-              new PositionPriorConstraint(prior_position, weight));
-      }
-
-      const Eigen::Vector3d prior_position_;
-      const double weight_;
-  };
-
-  void AddCoordinateSystemConstraint(Reconstruction* reconstruction);
-
-  void AddSequentialPairwisePoseConstraint(Reconstruction* reconstruction);
-
-  void AddSequentialTranslationConstraint(Reconstruction* reconstruction);
-
-  void AddPositionPriorConstraints(Reconstruction* reconstruction);
-
-  void AddImageToProblem(image_t image_id,
-                         Reconstruction* reconstruction,
-                         ceres::LossFunction* loss_function);
-
-  void AddPointToProblem(point3D_t point3D_id,
-                         Reconstruction* reconstruction,
-                         ceres::LossFunction* loss_function);
 
  protected:
-  void ParameterizeCameras(Reconstruction* reconstruction);
-  void ParameterizePoints(Reconstruction* reconstruction);
-
-  const BundleAdjustmentOptions options_;
+  BundleAdjustmentOptions options_;
   BundleAdjustmentConfig config_;
-  std::shared_ptr<ceres::Problem> problem_;
-  ceres::Solver::Summary summary_;
-  std::unordered_set<camera_t> camera_ids_;
-  std::unordered_map<point3D_t, size_t> point3D_num_observations_;
-
-  // Hold the life of loss function for Solve()
-  std::unique_ptr<ceres::LossFunction> loss_function_;
 };
 
-class RigBundleAdjuster : public BundleAdjuster {
- public:
-  struct Options {
-    // Whether to optimize the relative poses of the camera rigs.
-    bool refine_relative_poses = true;
+std::unique_ptr<BundleAdjuster> CreateDefaultBundleAdjuster(
+    BundleAdjustmentOptions options,
+    BundleAdjustmentConfig config,
+    Reconstruction& reconstruction);
 
-    // The maximum allowed reprojection error for an observation to be
-    // considered in the bundle adjustment. Some observations might have large
-    // reprojection errors due to the concatenation of the absolute and relative
-    // rig poses, which might be different from the absolute pose of the image
-    // in the reconstruction.
-    double max_reproj_error = 1000.0;
-  };
+std::unique_ptr<BundleAdjuster> CreateRigBundleAdjuster(
+    BundleAdjustmentOptions options,
+    RigBundleAdjustmentOptions rig_options,
+    BundleAdjustmentConfig config,
+    Reconstruction& reconstruction,
+    std::vector<CameraRig>& camera_rigs);
 
-  RigBundleAdjuster(const BundleAdjustmentOptions& options,
-                    const Options& rig_options,
-                    const BundleAdjustmentConfig& config);
-
-  bool Solve(Reconstruction* reconstruction,
-             std::vector<CameraRig>* camera_rigs);
-
-  void SetUpProblem(Reconstruction* reconstruction,
-                    std::vector<CameraRig>* camera_rigs,
-                    ceres::LossFunction* loss_function);
-
-  void TearDown(Reconstruction* reconstruction,
-                const std::vector<CameraRig>& camera_rigs);
-
- private:
-  void AddImageToProblem(image_t image_id,
-                         Reconstruction* reconstruction,
-                         std::vector<CameraRig>* camera_rigs,
-                         ceres::LossFunction* loss_function);
-
-  void AddPointToProblem(point3D_t point3D_id,
-                         Reconstruction* reconstruction,
-                         ceres::LossFunction* loss_function);
-
-  void ComputeCameraRigPoses(const Reconstruction& reconstruction,
-                             const std::vector<CameraRig>& camera_rigs);
-
-  void ParameterizeCameraRigs(Reconstruction* reconstruction);
-
-  const Options rig_options_;
-
-  // Mapping from images to camera rigs.
-  std::unordered_map<image_t, CameraRig*> image_id_to_camera_rig_;
-
-  // Mapping from images to the absolute camera rig poses.
-  std::unordered_map<image_t, Rigid3d*> image_id_to_rig_from_world_;
-
-  // For each camera rig, the absolute camera rig poses for all snapshots.
-  std::vector<std::vector<Rigid3d>> rigs_from_world_;
-
-  // The Quaternions added to the problem, used to set the local
-  // parameterization once after setting up the problem.
-  std::unordered_set<double*> parameterized_quats_;
-};
+std::unique_ptr<BundleAdjuster> CreatePosePriorBundleAdjuster(
+    BundleAdjustmentOptions options,
+    PosePriorBundleAdjustmentOptions prior_options,
+    BundleAdjustmentConfig config,
+    std::unordered_map<image_t, PosePrior> pose_priors,
+    Reconstruction& reconstruction);
 
 void PrintSolverSummary(const ceres::Solver::Summary& summary,
                         const std::string& header);
