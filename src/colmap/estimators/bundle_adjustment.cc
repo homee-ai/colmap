@@ -450,7 +450,6 @@ class DefaultBundleAdjuster : public BundleAdjuster {
     problem_options.loss_function_ownership = ceres::DO_NOT_TAKE_OWNERSHIP;
     problem_ = std::make_shared<ceres::Problem>(problem_options);
 
-    std::cout << "create default bundle adjuster" << std::endl;
     // Set up problem
     // Warning: AddPointsToProblem assumes that AddImageToProblem is called
     // first. Do not change order of instructions!
